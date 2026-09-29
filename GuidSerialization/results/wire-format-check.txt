@@ -1,0 +1,43 @@
+Sample 00112233-4455-6677-8899-aabbccddeeff
+  ToByteArray()     33221100554477668899AABBCCDDEEFF
+  ToByteArray(true) 00112233445566778899AABBCCDDEEFF
+  MyGuidStruct      Hi=0x0011223344556677 Lo=0x8899AABBCCDDEEFF
+  bcl.Guid on wire  0A12093322110055447766118899AABBCCDDEEFF
+  StructBE on wire  0A1209776655443322110011FFEEDDCCBBAA9988
+  StructCrazy wire  0A12093322110055447766118899AABBCCDDEEFF
+  StructCustom wire 0A1209776655443322110011FFEEDDCCBBAA9988
+  L300 default wire 0A2430303131323233332D343435352D363637372D383839392D616162626363646465656666
+  L300 fixed wire   0A1000112233445566778899AABBCCDDEEFF
+  Uuid on wire      0A1000112233445566778899AABBCCDDEEFF
+
+  Uuid nested       0A360A1000112233445566778899AABBCCDDEEFF121000000000000000000000000000000000121000112233445566778899AABBCCDDEEFF1007  round-trip OK
+  Uuid 4-byte payload rejected: ProtoException: Uuid field must be exactly 16 bytes, got 4
+
+  FromFast/ToGuidFast match the BinaryPrimitives version on 10,001 GUIDs
+
+N=1 wire bytes:
+  Native (bcl.Guid)          20  round-trip OK
+  NativeBytes                18  round-trip OK
+  BigEndianBytes             18  round-trip OK
+  String                     38  round-trip OK
+  MyGuidStruct               20  round-trip OK
+  MyGuidClass                20  round-trip OK
+  StructCrazy                20  round-trip OK
+  StructCustom               20  round-trip OK
+  L300Default                38  round-trip OK
+  Uuid (custom)              18  round-trip OK
+  L300FixedSize              18  round-trip OK
+
+N=1000 wire bytes:
+  Native (bcl.Guid)      20,000  round-trip OK
+  NativeBytes            18,000  round-trip OK
+  BigEndianBytes         18,000  round-trip OK
+  String                 38,000  round-trip OK
+  MyGuidStruct           20,000  round-trip OK
+  MyGuidClass            20,000  round-trip OK
+  StructCrazy            20,000  round-trip OK
+  StructCustom           20,000  round-trip OK
+  L300Default            38,000  round-trip OK
+  Uuid (custom)          18,000  round-trip OK
+  L300FixedSize          18,000  round-trip OK
+
