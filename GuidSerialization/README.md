@@ -17,6 +17,7 @@ than protobuf-net's built-in Guid, and deserializes at the same speed.
 - [Results](#results)
 - [Findings](#findings)
 - [The `Uuid` type](#the-uuid-type)
+- [In a `.proto` file, and from Python, C++ and Rust](#in-a-proto-file-and-from-python-c-and-rust)
 - [Running it](#running-it)
 
 ## Background: how a Guid is laid out
@@ -159,6 +160,167 @@ order.Id = Guid.NewGuid();
   rejects a `stackalloc` span argument (CS8350). A pointer-backed span is accepted, and it's safe because both
   calls copy the bytes before returning. Needs `<AllowUnsafeBlocks>true</AllowUnsafeBlocks>`.
 
+## In a `.proto` file, and from Python, C++ and Rust
+
+Protobuf has no UUID type, so the contract is a plain `bytes` field with the convention written in a comment:
+exactly 16 bytes, RFC 9562 order. [`proto/uuid_example.proto`](proto/uuid_example.proto):
+
+```proto
+syntax = "proto3";
+package guidserialization;
+
+// UUIDs are `bytes` fields holding exactly 16 bytes in RFC 9562 byte order: the order of the
+// canonical string, so 00112233-4455-6677-8899-aabbccddeeff is the bytes 00 11 22 33 ... ee ff.
+// An empty/absent field means "not set": .NET reads it as Guid.Empty.
+
+message Order {
+  bytes id = 1;                 // 16-byte UUID
+  repeated bytes line_ids = 2;  // 16-byte UUIDs
+  int32 quantity = 3;
+}
+```
+
+The matching .NET contract uses `Uuid` wherever the `.proto` has a UUID `bytes` field:
+
+```csharp
+[ProtoContract]
+public sealed class Order
+{
+    [ProtoMember(1)] public Uuid Id { get; set; }
+    [ProtoMember(2)] public List<Uuid> LineIds { get; set; } = [];
+    [ProtoMember(3)] public int Quantity { get; set; }
+}
+```
+
+Don't wrap the UUID in its own `message Uuid { bytes value = 1; }`. That's a nested message on the wire
+(2 extra bytes per value, and the sizing cost measured above), and it isn't what the `Uuid` serializer writes.
+
+**Watch for the "little-endian" UUID APIs.** Several libraries have a second constructor for Microsoft's
+mixed-endian layout, the same one `Guid.ToByteArray()` produces. Using it on this field would silently
+scramble the first 8 bytes:
+
+| Language | Use (RFC order) | Not this (Microsoft layout) |
+|---|---|---|
+| .NET | `Uuid`, or `new Guid(bytes, bigEndian: true)` / `ToByteArray(bigEndian: true)` | `new Guid(bytes)` / `ToByteArray()` |
+| Python | `uuid.UUID(bytes=b)` / `u.bytes` | `uuid.UUID(bytes_le=b)` / `u.bytes_le` |
+| Rust (`uuid` crate) | `Uuid::from_slice(b)` / `u.as_bytes()` | `Uuid::from_slice_le(b)` / `u.to_bytes_le()` |
+| C++ (Boost.Uuid) | copy the 16 bytes in as-is | – (no swapping needed) |
+
+### Python ✅ verified
+
+`protobuf` + the standard library `uuid` module. [`interop/python/roundtrip.py`](interop/python/roundtrip.py)
+reads an `Order` written by .NET, asserts the UUIDs match, and writes one back that .NET reads. Both
+directions pass, including an all-zero (Guid.Empty) line ID.
+
+```python
+import uuid
+import uuid_example_pb2 as pb   # python -m grpc_tools.protoc -I proto --python_out=. proto/uuid_example.proto
+
+def to_uuid(raw: bytes) -> uuid.UUID:
+    return uuid.UUID(bytes=raw) if raw else uuid.UUID(int=0)   # empty = not set
+
+order = pb.Order()
+order.ParseFromString(data)
+print(to_uuid(order.id))                        # 00112233-4455-6677-8899-aabbccddeeff
+line_ids = [to_uuid(b) for b in order.line_ids]
+
+reply = pb.Order(id=uuid.uuid4().bytes, quantity=1)            # .bytes, not .bytes_le
+data = reply.SerializeToString()
+```
+
+### C++ (not compiled here)
+
+Generated code (`protoc --cpp_out=. uuid_example.proto`) exposes `bytes` fields as `std::string`. With
+Boost.Uuid, whose 16 bytes are stored in RFC order:
+
+```cpp
+#include <algorithm>
+#include <stdexcept>
+#include <string>
+#include <boost/uuid/uuid.hpp>
+#include <boost/uuid/uuid_io.hpp>
+#include "uuid_example.pb.h"
+
+boost::uuids::uuid to_uuid(const std::string& raw) {
+    boost::uuids::uuid u{};                                   // nil if not set
+    if (raw.empty()) return u;
+    if (raw.size() != 16) throw std::runtime_error("UUID field must be 16 bytes");
+    std::copy(raw.begin(), raw.end(), u.begin());             // RFC order: no byte swapping
+    return u;
+}
+
+std::string to_bytes(const boost::uuids::uuid& u) {
+    return std::string(u.begin(), u.end());
+}
+
+guidserialization::Order order;
+order.ParseFromString(data);
+std::cout << to_uuid(order.id()) << '\n';                     // 00112233-4455-6677-8899-aabbccddeeff
+for (const auto& raw : order.line_ids()) std::cout << to_uuid(raw) << '\n';
+
+order.set_id(to_bytes(some_uuid));
+```
+
+Without Boost, a `std::array<std::uint8_t, 16>` filled with the same `std::copy` holds it in the same order.
+
+### Rust (not compiled here)
+
+`prost` for protobuf plus the `uuid` crate. `prost` maps `bytes` to `Vec<u8>`:
+
+```toml
+# Cargo.toml
+[dependencies]
+prost = "0.13"
+uuid = "1"
+
+[build-dependencies]
+prost-build = "0.13"    # needs protoc on PATH (or the protoc-bin-vendored crate)
+```
+
+```rust
+// build.rs
+fn main() -> std::io::Result<()> {
+    prost_build::compile_protos(&["proto/uuid_example.proto"], &["proto/"])
+}
+```
+
+```rust
+// main.rs
+use prost::Message;
+use uuid::Uuid;
+
+pub mod guidserialization {
+    include!(concat!(env!("OUT_DIR"), "/guidserialization.rs"));
+}
+use guidserialization::Order;
+
+fn to_uuid(raw: &[u8]) -> Result<Uuid, uuid::Error> {
+    if raw.is_empty() { Ok(Uuid::nil()) } else { Uuid::from_slice(raw) }   // not from_slice_le
+}
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let data = std::fs::read("from-dotnet.bin")?;
+    let order = Order::decode(data.as_slice())?;
+    println!("{}", to_uuid(&order.id)?);                // 00112233-4455-6677-8899-aabbccddeeff
+    for raw in &order.line_ids {
+        println!("{}", to_uuid(raw)?);
+    }
+
+    let reply = Order {
+        id: Uuid::parse_str("fedcba98-7654-3210-0123-456789abcdef")?.as_bytes().to_vec(),
+        line_ids: vec![],
+        quantity: 1,
+    };
+    std::fs::write("to-dotnet.bin", reply.encode_to_vec())?;
+    Ok(())
+}
+```
+
+### Other languages
+
+The same 16 bytes work anywhere with a UUID type that takes RFC-order bytes. For example, Java:
+`var bb = ByteBuffer.wrap(bytes); new UUID(bb.getLong(), bb.getLong())`. Go (`google/uuid`): `uuid.FromBytes(b)`.
+
 ## Running it
 
 ```bash
@@ -167,6 +329,18 @@ dotnet run -c Release -- --check                        # round-trip + wire-form
 dotnet run -c Release -- --filter '*'                   # everything (~20 minutes)
 dotnet run -c Release -- --filter '*StructBenchmarks*'  # formats, Level300, Uuid, conversion
 dotnet run -c Release -- --filter '*GrpcBenchmarks*'    # gRPC round trips (Kestrel on localhost:50151)
+dotnet run -c Release -- --export order.bin             # write a known Order for another language
+dotnet run -c Release -- --import order.bin             # read an Order written by another language
+```
+
+Python interop test (from `interop/python`):
+
+```bash
+pip install grpcio-tools
+python -m grpc_tools.protoc -I ../../proto --python_out=. ../../proto/uuid_example.proto
+dotnet run -c Release --project ../.. -- --export from-dotnet.bin
+python roundtrip.py from-dotnet.bin to-dotnet.bin
+dotnet run -c Release --project ../.. -- --import to-dotnet.bin
 ```
 
 | File | Contents |
@@ -175,4 +349,6 @@ dotnet run -c Release -- --filter '*GrpcBenchmarks*'    # gRPC round trips (Kest
 | [`Contracts.cs`](Contracts.cs) | All message types, the two-long structs, `Guid[]` mapping, gRPC service |
 | [`Benchmarks.cs`](Benchmarks.cs) | `SerializationBenchmarks` (N = 1 and 1,000) and `GrpcBenchmarks` |
 | [`StructBenchmarks.cs`](StructBenchmarks.cs) | Conversion, sizing, stream vs buffer, Level300, `Uuid` |
-| [`Program.cs`](Program.cs) | Wire-format and round-trip check, then BenchmarkDotNet |
+| [`Program.cs`](Program.cs) | Wire-format and round-trip check, `--export`/`--import`, then BenchmarkDotNet |
+| [`proto/uuid_example.proto`](proto/uuid_example.proto) | How to declare UUID fields for other languages |
+| [`interop/python/roundtrip.py`](interop/python/roundtrip.py) | .NET ↔ Python round-trip check |

@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+package guidserialization;
+
+option csharp_namespace = "GuidSerialization";
+
+// UUIDs are `bytes` fields holding exactly 16 bytes in RFC 9562 byte order: the order of the
+// canonical string, so 00112233-4455-6677-8899-aabbccddeeff is the bytes 00 11 22 33 ... ee ff.
+// On the .NET side each maps to the Uuid struct (Uuid.cs); every other language reads them with its
+// standard UUID type (Python uuid.UUID(bytes=...), Rust uuid::Uuid::from_slice, Boost.Uuid, Java, Go...).
+//
+// An empty/absent field means "not set": .NET reads it as Guid.Empty.
+
+message UuidList {
+  repeated bytes ids = 1;       // 16-byte UUIDs
+}
+
+message Order {
+  bytes id = 1;                 // 16-byte UUID
+  repeated bytes line_ids = 2;  // 16-byte UUIDs
+  int32 quantity = 3;
+}

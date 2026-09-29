@@ -2,6 +2,9 @@ bin/
 obj/
 BenchmarkDotNet.Artifacts/
 *.log
+*.bin
+*_pb2.py
+__pycache__/
 .vs/
 .idea/
 *.user

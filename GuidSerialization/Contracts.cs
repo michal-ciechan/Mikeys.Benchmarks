@@ -165,6 +165,16 @@ public sealed class MyGuidClass
 [ProtoContract] public sealed class UuidInner { [ProtoMember(1)] public Uuid Id { get; set; } [ProtoMember(2)] public List<Uuid> More { get; set; } = []; }
 [ProtoContract] public sealed class UuidOuter { [ProtoMember(1)] public UuidInner? Inner { get; set; } [ProtoMember(2)] public int After { get; set; } }
 
+// The .NET side of proto/uuid_example.proto's Order message - used by --export/--import for the
+// cross-language test in interop/.
+[ProtoContract]
+public sealed class Order
+{
+    [ProtoMember(1)] public Uuid Id { get; set; }
+    [ProtoMember(2)] public List<Uuid> LineIds { get; set; } = [];
+    [ProtoMember(3)] public int Quantity { get; set; }
+}
+
 // protobuf-net 3 compatibility level 300: Guid with default data format, and with FixedSize.
 [ProtoContract, CompatibilityLevel(CompatibilityLevel.Level300)]
 public sealed class L300DefaultMessage { [ProtoMember(1)] public List<Guid> Ids { get; set; } = []; }

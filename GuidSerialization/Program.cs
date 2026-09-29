@@ -9,6 +9,28 @@ if (args.Contains("--check"))
     return;
 }
 
+// --export <file>: write a known Order for another language to read (see interop/).
+if (args is ["--export", var exportPath])
+{
+    var order = new Order
+    {
+        Id = new Guid("00112233-4455-6677-8899-aabbccddeeff"),
+        LineIds = [new Guid("0190a6f8-4c3e-7b2a-9d1f-123456789abc"), Guid.Empty],
+        Quantity = 3,
+    };
+    File.WriteAllBytes(exportPath, Bytes(order));
+    Console.WriteLine($"Wrote {exportPath}: id={order.Id} lineIds=[{string.Join(", ", order.LineIds)}] quantity={order.Quantity}");
+    return;
+}
+
+// --import <file>: read an Order written by another language and print it.
+if (args is ["--import", var importPath])
+{
+    var order = Serializer.Deserialize<Order>((ReadOnlySpan<byte>)File.ReadAllBytes(importPath));
+    Console.WriteLine($"Read {importPath}: id={order.Id} lineIds=[{string.Join(", ", order.LineIds)}] quantity={order.Quantity}");
+    return;
+}
+
 Check();
 BenchmarkSwitcher.FromAssembly(typeof(Program).Assembly).Run(args);
 
