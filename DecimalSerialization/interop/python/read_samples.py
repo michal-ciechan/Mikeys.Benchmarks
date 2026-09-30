@@ -47,6 +47,21 @@ def from_decimal64(bits: int) -> Decimal:
     return Decimal((sign, tuple(int(c) for c in str(coefficient)), exponent - 398))
 
 
+def from_decimal128(raw: bytes) -> Decimal:
+    """IEEE 754-2008 decimal128, BID encoding, 16 bytes little-endian."""
+    bits = int.from_bytes(raw, "little")
+    sign = bits >> 127
+    if (bits >> 125) & 0b11 == 0b11:
+        if (bits >> 123) & 0b11 == 0b11:
+            raise ValueError("infinity or NaN")
+        return Decimal((sign, (0,), 0))     # large-coefficient form is always non-canonical: zero
+    exponent = (bits >> 113) & 0x3FFF
+    coefficient = bits & ((1 << 113) - 1)
+    if coefficient > 10**34 - 1:
+        coefficient = 0
+    return Decimal((sign, tuple(int(c) for c in str(coefficient)), exponent - 6176))
+
+
 def from_packed_decimal64(raw: int) -> Decimal:
     scale = raw & 31                        # low 5 bits
     mantissa = raw >> 5                     # arithmetic shift keeps the sign
@@ -64,6 +79,7 @@ decoded = {
     "fixed_decimal": [from_fixed_decimal(r) for r in samples.fixed_decimal],
     "decimal64 (BID)": [from_decimal64(b) for b in samples.decimal64],
     "packed_decimal64": [from_packed_decimal64(r) for r in samples.packed_decimal64],
+    "decimal128 (BID)": [from_decimal128(b) for b in samples.decimal128],
 }
 
 failed = False

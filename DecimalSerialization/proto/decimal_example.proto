@@ -25,4 +25,5 @@ message Samples {
   repeated sint64 fixed_decimal = 4;      // FixedDecimal: value × 10^8
   repeated fixed64 decimal64 = 5;         // IEEE 754-2008 decimal64, BID encoding
   repeated sint64 packed_decimal64 = 6;   // PackedDecimal64: mantissa << 5 | scale
+  repeated bytes decimal128 = 7;          // IEEE 754-2008 decimal128, BID encoding, 16 bytes little-endian
 }

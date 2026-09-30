@@ -1,39 +1,52 @@
-Sample 123.45 - one value as a repeated-field item:
-  Native (bcl)      0A0508B9601804
-  String            0A063132332E3435
-  Level300          0A063132332E3435
-  UnitsNanos        0A08087B1080E9C9D601
-  FixedDecimal      0880818EFD5B
-  Decimal64 (BID)   093930000000008031
-  PackedDecimal64   08C49C30
-  -123.45 bcl       0A0508B9601805
+Sample 123.45 - one value as a repeated-field item (packed: the whole field):
+  Native (bcl)         0A0508B9601804
+  BclDecimalFast       0A0508B9601804
+  String / Utf8        0A063132332E3435
+  UnitsNanos           0A08087B1080E9C9D601
+  FixedDecimal         0880818EFD5B
+  FixedDecimal packed  0880818EFD5B
+  Decimal64            093930000000008031
+  Decimal64 packed     093930000000008031
+  PackedDecimal64      08C49C30
+  Packed64 packed      08C49C30
+  Decimal128           0A1039300000000000000000000000003C30
+  Decimal128 packed    0A1039300000000000000000000000003C30
+
+  BclDecimalFast, Utf8Decimal and Level300 are byte-identical to the formats they replace
 
 Benchmark data (1,000 values), wire bytes:
-  Native (bcl)          9,884  round-trip OK
-  String               13,286  round-trip OK
-  Level300             13,286  round-trip OK
-  UnitsNanos           16,895  round-trip OK
-  FixedDecimal          8,026  round-trip OK
-  Decimal64 (BID)       9,000  round-trip OK
-  PackedDecimal64       6,936  round-trip OK
+  Native (bcl)            9,884  round-trip OK
+  BclDecimalFast          9,884  round-trip OK
+  String                 13,286  round-trip OK
+  Level300               13,286  round-trip OK
+  Utf8Decimal            13,286  round-trip OK
+  UnitsNanos             16,895  round-trip OK
+  FixedDecimal            8,026  round-trip OK
+  FixedDecimal packed     7,029  round-trip OK
+  Decimal64               9,000  round-trip OK
+  Decimal64 packed        8,003  round-trip OK
+  PackedDecimal64         6,936  round-trip OK
+  Packed64 packed         5,939  round-trip OK
+  Decimal128             18,000  round-trip OK
+  Decimal128 packed      16,003  round-trip OK
 
 Boundaries - ok | ok,s=N (value equal, scale became N) | overflow | too precise:
-  value                             Native       String       UnitsNanos   FixedDecimal Decimal64    Packed64     
-  0                                 ok           ok           ok           ok,s=8       ok           ok           
-  1.10                              ok           ok           ok,s=1       ok,s=8       ok           ok           
-  0.00000001                        ok           ok           ok           ok           ok           ok           
-  0.000000001                       ok           ok           ok           too precise  ok           ok           
-  0.0000000001                      ok           ok           too precise  too precise  ok           ok           
-  0.0000000000000000000000000001    ok           ok           too precise  too precise  ok           ok           
-  0.3333333333333333333333333333    ok           ok           too precise  too precise  too precise  too precise  
-  9999999999999999                  ok           ok           ok           overflow     ok           ok           
-  99999999999999999                 ok           ok           ok           overflow     too precise  ok           
-  288230376151711743                ok           ok           ok           overflow     too precise  ok           
-  288230376151711744                ok           ok           ok           overflow     too precise  overflow     
-  92233720368.54775807              ok           ok           ok           ok           too precise  too precise  
-  92233720368.54775808              ok           ok           ok           overflow     too precise  too precise  
-  9223372036854775807               ok           ok           ok           overflow     too precise  overflow     
-  9223372036854775807.999999999     ok           ok           ok           too precise  too precise  too precise  
-  100000000000000000000             ok           ok           overflow     overflow     ok           overflow     
-  79228162514264337593543950335     ok           ok           overflow     overflow     too precise  overflow     
-  -79228162514264337593543950335    ok           ok           overflow     overflow     too precise  overflow     
+  value                             Native       String       UnitsNanos   FixedDecimal Decimal64    Packed64     Decimal128   
+  0                                 ok           ok           ok,s=9       ok,s=8       ok           ok           ok           
+  1.10                              ok           ok           ok,s=9       ok,s=8       ok           ok           ok           
+  0.00000001                        ok           ok           ok,s=9       ok           ok           ok           ok           
+  0.000000001                       ok           ok           ok           too precise  ok           ok           ok           
+  0.0000000001                      ok           ok           too precise  too precise  ok           ok           ok           
+  0.0000000000000000000000000001    ok           ok           too precise  too precise  ok           ok           ok           
+  0.3333333333333333333333333333    ok           ok           too precise  too precise  too precise  too precise  ok           
+  9999999999999999                  ok           ok           ok,s=9       overflow     ok           ok           ok           
+  99999999999999999                 ok           ok           ok,s=9       overflow     too precise  ok           ok           
+  288230376151711743                ok           ok           ok,s=9       overflow     too precise  ok           ok           
+  288230376151711744                ok           ok           ok,s=9       overflow     too precise  overflow     ok           
+  92233720368.54775807              ok           ok           ok,s=9       ok           too precise  too precise  ok           
+  92233720368.54775808              ok           ok           ok,s=9       overflow     too precise  too precise  ok           
+  9223372036854775807               ok           ok           ok,s=9       overflow     too precise  overflow     ok           
+  9223372036854775807.999999999     ok           ok           ok           too precise  too precise  too precise  ok           
+  100000000000000000000             ok           ok           overflow     overflow     ok           overflow     ok           
+  79228162514264337593543950335     ok           ok           overflow     overflow     too precise  overflow     ok           
+  -79228162514264337593543950335    ok           ok           overflow     overflow     too precise  overflow     ok           
