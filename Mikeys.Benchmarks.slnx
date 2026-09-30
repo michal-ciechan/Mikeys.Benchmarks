@@ -1,3 +1,4 @@
 <Solution>
+  <Project Path="DecimalSerialization/DecimalSerialization.csproj" />
   <Project Path="GuidSerialization/GuidSerialization.csproj" />
 </Solution>

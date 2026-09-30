@@ -1,0 +1,28 @@
+syntax = "proto3";
+
+package decimalserialization;
+
+option csharp_namespace = "DecimalSerialization";
+
+// protobuf-net's built-in System.Decimal ("bcl.Decimal"): value = ±(hi << 64 | lo) / 10^scale,
+// where sign_scale = scale << 1 | sign (bit 0 set = negative). Scale is 0-28.
+message BclDecimal {
+  uint64 lo = 1;          // low 64 bits of the 96-bit mantissa
+  uint32 hi = 2;          // high 32 bits of the 96-bit mantissa
+  uint32 sign_scale = 3;  // scale << 1 | sign
+}
+
+// google.type.Money's number part: value = units + nanos / 10^9, both with the same sign.
+message UnitsNanos {
+  int64 units = 1;
+  int32 nanos = 2;        // -999,999,999 .. 999,999,999
+}
+
+message Samples {
+  repeated BclDecimal native = 1;
+  repeated string text = 2;               // invariant culture, e.g. "-98765.4321"
+  repeated UnitsNanos units_nanos = 3;
+  repeated sint64 fixed_decimal = 4;      // FixedDecimal: value × 10^8
+  repeated fixed64 decimal64 = 5;         // IEEE 754-2008 decimal64, BID encoding
+  repeated sint64 packed_decimal64 = 6;   // PackedDecimal64: mantissa << 5 | scale
+}
