@@ -1,0 +1,6 @@
+fake                    create   start register provider   first  other19    TOTAL   (median ms of 15 fresh processes; min..max total)
+Handwritten                  2       0        3       47      25        7       88   74..161
+MockHttp                     5       0       12       64      49       20      160   110..219
+HttpClientInterception       2       0       18       66      48       12      143   105..211
+MoqContrib                  18       0      376      109      34       10      568   434..662
+WireMock                     0     274       13       26     949      130     1495   1140..1780
